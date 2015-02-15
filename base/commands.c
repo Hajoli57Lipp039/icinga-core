@@ -4306,6 +4306,10 @@ void acknowledge_host_problem(host *hst, char *ack_author, char *ack_data, int t
 
 	time(&current_time);
 
+	if (end_time > hst->acknowledgement_end_time && hst->problem_has_been_acknowledged == TRUE && hst->acknowledgement_end_time > 0L) {
+		remove_host_acknowledgement(hst);
+	}
+
 #ifdef USE_EVENT_BROKER
 	/* send data to event broker */
 	broker_acknowledgement_data_expire(NEBTYPE_ACKNOWLEDGEMENT_ADD, NEBFLAG_NONE, NEBATTR_NONE, HOST_ACKNOWLEDGEMENT, (void *)hst, ack_author, ack_data, type, notify, persistent, end_time, NULL);
@@ -4322,9 +4326,13 @@ void acknowledge_host_problem(host *hst, char *ack_author, char *ack_data, int t
 	hst->acknowledgement_type = (type == ACKNOWLEDGEMENT_STICKY) ? ACKNOWLEDGEMENT_STICKY : ACKNOWLEDGEMENT_NORMAL;
 
 	/* set the acknowledgement expire time type */
-	if (end_time > current_time)
+	if (end_time > current_time) {
+		/* make sure to delete any previous expire time events */
+		delete_scheduled_event(EVENT_EXPIRE_ACKNOWLEDGEMENT, TRUE, hst->acknowledgement_end_time, FALSE, 0, NULL, FALSE, hst, NULL, HOST_ACKNOWLEDGEMENT);
+
+		/* schedule a new expire time event */
 		schedule_new_event(EVENT_EXPIRE_ACKNOWLEDGEMENT, TRUE, (end_time + 1), FALSE, 0, NULL, FALSE, hst, NULL, HOST_ACKNOWLEDGEMENT);
-	else
+	} else
 		end_time = (time_t)0;
 
 	hst->acknowledgement_end_time = end_time;
@@ -4347,6 +4355,10 @@ void acknowledge_service_problem(service *svc, char *ack_author, char *ack_data,
 	if (svc->current_state == STATE_OK)
 		return;
 
+	if (end_time > svc->acknowledgement_end_time && svc->problem_has_been_acknowledged == TRUE && svc->acknowledgement_end_time > 0L) {
+		remove_service_acknowledgement(svc);
+	}
+
 	time(&current_time);
 
 #ifdef USE_EVENT_BROKER
@@ -4365,9 +4377,13 @@ void acknowledge_service_problem(service *svc, char *ack_author, char *ack_data,
 	svc->acknowledgement_type = (type == ACKNOWLEDGEMENT_STICKY) ? ACKNOWLEDGEMENT_STICKY : ACKNOWLEDGEMENT_NORMAL;
 
 	/* set the acknowledgement expire time type */
-	if (end_time > current_time)
+	if (end_time > current_time) {
+		/* make sure to delete any previous expire time events */
+		delete_scheduled_event(EVENT_EXPIRE_ACKNOWLEDGEMENT, TRUE, svc->acknowledgement_end_time, FALSE, 0, NULL, FALSE, svc, NULL, SERVICE_ACKNOWLEDGEMENT);
+
+		/* schedule a new expire time event */
 		schedule_new_event(EVENT_EXPIRE_ACKNOWLEDGEMENT, TRUE, (end_time + 1), FALSE, 0, NULL, FALSE, svc, NULL, SERVICE_ACKNOWLEDGEMENT);
-	else
+	} else
 		end_time = (time_t)0;
 
 	svc->acknowledgement_end_time = end_time;

@@ -1704,10 +1704,14 @@ void show_host_info(void) {
 				printf("<tr class='command'><td><img src='%s%s' border='0' alt='Start Obsessing Over This Host' title='Start Obsessing Over This Host'></td><td class='command'><a href='%s?cmd_typ=%d&amp;host=%s'>Start obsessing over this host</a></td></tr>\n", url_images_path, ENABLED_ICON, CMD_CGI, CMD_START_OBSESSING_OVER_HOST, url_encode(host_name));
 
 			if (temp_hoststatus->status == HOST_DOWN || temp_hoststatus->status == HOST_UNREACHABLE) {
-				if (temp_hoststatus->problem_has_been_acknowledged == FALSE)
-					printf("<tr class='command'><td><img src='%s%s' border='0' alt='Acknowledge This Host Problem' title='Acknowledge This Host Problem'></td><td class='command'><a href='%s?cmd_typ=%d&amp;host=%s'>Acknowledge this host problem</a></td></tr>\n", url_images_path, ACKNOWLEDGEMENT_ICON, CMD_CGI, CMD_ACKNOWLEDGE_HOST_PROBLEM, url_encode(host_name));
-				else
+				if (temp_hoststatus->problem_has_been_acknowledged == TRUE) {
+					if (temp_hoststatus->acknowledgement_end_time > 0L) {
+						printf("<tr class='command'><td><img src='%s%s' border='0' alt='Extend Expire Time For Acknowledgement' title='Extend Expire Time For Acknowledgement'></td><td class='command'><a href='%s?cmd_typ=%d&amp;host=%s&amp;use_ack_end_time=1'>Acknowledge this host problem</a></td></tr>\n", url_images_path, ACKNOWLEDGEMENT_ICON, CMD_CGI, CMD_ACKNOWLEDGE_HOST_PROBLEM, url_encode(host_name));
+					}
 					printf("<tr class='command'><td><img src='%s%s' border='0' alt='Remove Problem Acknowledgement' title='Remove Problem Acknowledgement'></td><td class='command'><a href='%s?cmd_typ=%d&amp;host=%s'>Remove problem acknowledgement</a></td></tr>\n", url_images_path, REMOVE_ACKNOWLEDGEMENT_ICON, CMD_CGI, CMD_REMOVE_HOST_ACKNOWLEDGEMENT, url_encode(host_name));
+				} else {
+					printf("<tr class='command'><td><img src='%s%s' border='0' alt='Acknowledge This Host Problem' title='Acknowledge This Host Problem'></td><td class='command'><a href='%s?cmd_typ=%d&amp;host=%s'>Acknowledge this host problem</a></td></tr>\n", url_images_path, ACKNOWLEDGEMENT_ICON, CMD_CGI, CMD_ACKNOWLEDGE_HOST_PROBLEM, url_encode(host_name));
+				}
 			}
 
 			if (temp_hoststatus->notifications_enabled == TRUE)
@@ -2201,12 +2205,16 @@ void show_service_info(void) {
 			}
 
 			if ((temp_svcstatus->status == SERVICE_WARNING || temp_svcstatus->status == SERVICE_UNKNOWN || temp_svcstatus->status == SERVICE_CRITICAL) && temp_svcstatus->state_type == HARD_STATE) {
-				if (temp_svcstatus->problem_has_been_acknowledged == FALSE) {
-					printf("<tr class='command'><td><img src='%s%s' border='0' alt='Acknowledge This Service Problem' title='Acknowledge This Service Problem'></td><td class='command'><a href='%s?cmd_typ=%d&amp;host=%s", url_images_path, ACKNOWLEDGEMENT_ICON, CMD_CGI, CMD_ACKNOWLEDGE_SVC_PROBLEM, url_encode(host_name));
-					printf("&amp;service=%s'>Acknowledge this service problem</a></td></tr>\n", url_encode(service_desc));
-				} else {
+				if (temp_svcstatus->problem_has_been_acknowledged == TRUE) {
+					if (temp_svcstatus->acknowledgement_end_time > 0L) {
+						printf("<tr class='command'><td><img src='%s%s' border='0' alt='Extend Expire Time For Acknowledgement' title='Extend Expire Time For Acknowledgement'></td><td class='command'><a href='%s?cmd_typ=%d&amp;host=%s", url_images_path, ACKNOWLEDGEMENT_ICON, CMD_CGI, CMD_ACKNOWLEDGE_SVC_PROBLEM, url_encode(host_name));
+						printf("&amp;service=%s&amp;use_ack_end_time=1'>Extend Expire Time For Acknowledgement</a></td></tr>\n", url_encode(service_desc));
+					}
 					printf("<tr class='command'><td><img src='%s%s' border='0' alt='Remove Problem Acknowledgement' title='Remove Problem Acknowledgement'></td><td class='command'><a href='%s?cmd_typ=%d&amp;host=%s", url_images_path, REMOVE_ACKNOWLEDGEMENT_ICON, CMD_CGI, CMD_REMOVE_SVC_ACKNOWLEDGEMENT, url_encode(host_name));
 					printf("&amp;service=%s'>Remove problem acknowledgement</a></td></tr>\n", url_encode(service_desc));
+				} else {
+					printf("<tr class='command'><td><img src='%s%s' border='0' alt='Acknowledge This Service Problem' title='Acknowledge This Service Problem'></td><td class='command'><a href='%s?cmd_typ=%d&amp;host=%s", url_images_path, ACKNOWLEDGEMENT_ICON, CMD_CGI, CMD_ACKNOWLEDGE_SVC_PROBLEM, url_encode(host_name));
+					printf("&amp;service=%s'>Acknowledge this service problem</a></td></tr>\n", url_encode(service_desc));
 				}
 			}
 			if (temp_svcstatus->notifications_enabled == TRUE) {
