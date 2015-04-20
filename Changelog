@@ -19,6 +19,12 @@ NEWS
 * This is the Icinga 1.x development branch. If you are looking for Icinga 2.x
   please check https://www.icinga.org/icinga2
 
+1.14.0 - dd/mm/2015
+
+FIXES
+
+* Bug #5416: idoutils: fix logentries inserts (oracle only) - TD
+
 1.13.2 - 08/05/2015
 
 FIXES

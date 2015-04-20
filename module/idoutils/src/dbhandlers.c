@@ -1175,7 +1175,8 @@ int ido2db_handle_logentry(ido2db_idi *idi) {
 	int x = 0;
 
 #ifdef USE_ORACLE
-	int n_zero = 0L;
+	int n_zero = 0;
+	OCI_Lob *lob_i;
 	void *data[9];
 #endif
 
@@ -1270,9 +1271,8 @@ int ido2db_handle_logentry(ido2db_idi *idi) {
 		return IDO_ERROR;
 	}
 
-	OCI_Commit(idi->dbinfo.oci_connection);
+	/* retrieve results */
 	idi->dbinfo.oci_resultset = OCI_GetResultset(idi->dbinfo.oci_statement_logentries_select);
-
 	if (OCI_FetchNext(idi->dbinfo.oci_resultset)) {
 		ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logentry() fetchnext ok\n");
 		duplicate_record = IDO_TRUE;
@@ -1358,8 +1358,6 @@ int ido2db_handle_logentry(ido2db_idi *idi) {
 		return IDO_ERROR;
 
 	/* set only values needed */
-	n_zero = 0L;
-
 	data[0] = (void *) &idi->dbinfo.instance_id;
 	data[1] = (void *) &etime;
 	data[2] = (void *) &etime;
@@ -1368,64 +1366,79 @@ int ido2db_handle_logentry(ido2db_idi *idi) {
 	data[5] = (void *) &es[0];
 	data[6] = (void *) &n_zero;
 	data[7] = (void *) &n_zero;
-	data[8] = (void *) &object_id;
+	//data[8] = (void *) &object_id;
 
 	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X1"), (uint *) data[0])) {
 		return IDO_ERROR;
 	}
-	if (!OCI_BindString(idi->dbinfo.oci_statement_logentries_insert, MT(":X2"), *(char **) data[1], 0)) {
-		return IDO_ERROR;
+
+	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X2"), (uint *) data[1])) {//unixtimestamp
+				return IDO_ERROR;
 	}
-	if (!OCI_BindString(idi->dbinfo.oci_statement_logentries_insert, MT(":X3"), *(char **) data[2], 0)) {
-		return IDO_ERROR;
+
+	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X3"), (uint *) data[2])) {//unixtimestamp
+					return IDO_ERROR;
 	}
-	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X4"), (uint *) data[3])) {
-		return IDO_ERROR;
-	}
-	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X5"), (uint *) data[4])) {
+
+	if (!OCI_BindInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X4"), (int *) data[3])) {
 		return IDO_ERROR;
 	}
 
-	if (es[0] == NULL) {
-		if (ido2db_oci_prepared_statement_bind_null_param(idi->dbinfo.oci_statement_logentries_insert, ":X6") == IDO_ERROR) {
-			return IDO_ERROR;
-		}
-	} else {
-		if (!OCI_BindString(idi->dbinfo.oci_statement_logentries_insert, MT(":X6"), *(char **) data[5], 0)) {
-			return IDO_ERROR;
-		}
+	if (!OCI_BindInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X5"), (int *) data[4])) {
+		return IDO_ERROR;
 	}
 
-	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X7"), (uint *) data[6])) {
+	if (!OCI_BindInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X7"), (int *) data[6])) {
 		return IDO_ERROR;
 	}
-	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X8"), (uint *) data[7])) {
+
+	if (!OCI_BindInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X8"), (int *) data[7])) {
 		return IDO_ERROR;
 	}
-	if (object_id == 0) {
-		if (ido2db_oci_prepared_statement_bind_null_param(idi->dbinfo.oci_statement_logentries_insert, ":X9") == IDO_ERROR) {
-			return IDO_ERROR;
-		}
-	}else {
-		if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X9"), (uint *) data[8])) {
-			return IDO_ERROR;
-		}
-	}
+
+    ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logdata() bind X9..(%lu)\n",object_id);
+    if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X9"),(uint *) &object_id)) {
+                        return IDO_ERROR;
+    }
+    /* important: bind first then set this bind to Null */
+    if (object_id == 0) {
+        /* get bind ptr, set to NULL */
+    	ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logdata() set X9 NULL\n");
+    	if (!OCI_BindSetNull(OCI_GetBind2(idi->dbinfo.oci_statement_logentries_insert, MT(":X9")))) {
+            				return IDO_ERROR;
+    	}
+    }
+
+
+	//bind clob
+	lob_i = OCI_LobCreate(idi->dbinfo.oci_connection, OCI_CLOB);
+	ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logentries_insert() bind clob\n");
+	result = ido2db_oci_bind_clob(idi->dbinfo.oci_statement_logentries_insert, ":X6", *(char **) data[5], &lob_i);
 
 	/* execute statement */
-	if (!OCI_Execute(idi->dbinfo.oci_statement_logentries_insert)) {
-		ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_query_logentries_insert() execute error\n");
-		return IDO_ERROR;
+	if (result == IDO_OK) {
+			/* execute statement */
+			result = OCI_Execute(idi->dbinfo.oci_statement_logentries_insert) ? IDO_OK : IDO_ERROR;
+			if (result == IDO_OK) {
+				/* commit statement */
+				OCI_Commit(idi->dbinfo.oci_connection);
+				ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logentries_insert() executed\n");
+			} else {
+				OCI_Rollback(idi->dbinfo.oci_connection);
+				ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logentries_insert() execute error\n");
+			}
+	} else {
+			ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logentries_insert() clob bind error\n");
 	}
 
-	/* commit statement */
-	OCI_Commit(idi->dbinfo.oci_connection);
+	//free lobs
+	if (lob_i != NULL) OCI_LobFree(lob_i);
 
 	/* do not free statement yet! */
 
 #endif /* Oracle ocilib specific */
 
-	free(buf);
+	if (buf) free(buf);
 
 	/* record timestamp of last log entry */
 	idi->dbinfo.last_logentry_time = etime;
@@ -1742,7 +1755,7 @@ int ido2db_handle_logdata(ido2db_idi *idi) {
 	int x = 0;
 
 #ifdef USE_ORACLE
-	unsigned long n_one = 1L;
+	int n_one = 1;
 	void *data[9];
 	OCI_Lob * lob_i;
 #endif
@@ -1851,61 +1864,69 @@ int ido2db_handle_logdata(ido2db_idi *idi) {
 	data[5] = (void *) &es[0];
 	data[6] = (void *) &n_one;
 	data[7] = (void *) &n_one;
-	data[8] = (void *) &object_id;
+//	data[8] = (void *) &object_id;
 
+
+	if (idi->dbinfo.oci_statement_logentries_insert)
 	ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logdata() data array\n");
 
-	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X1"), (uint *) data[0])) {
+	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X1"),(uint *) data[0])) {
 		return IDO_ERROR;
 	}
-	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X2"), (uint *) data[1])) { /* unixtimestamp instead of time2sql */
+	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X2"),(uint *) data[1])) { /* unixtimestamp instead of time2sql */
 		return IDO_ERROR;
 	}
-	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X3"), (uint *) data[2])) { /* unixtimestamp instead of time2sql */
+	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X3"),(uint *) data[2])) { /* unixtimestamp instead of time2sql */
 		return IDO_ERROR;
 	}
-	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X4"), (uint *) data[3])) {
+	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X4"),(uint *) data[3])) {
 		return IDO_ERROR;
 	}
-	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X5"), (uint *) data[4])) {
+	if (!OCI_BindInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X5"),(int *) data[4])) {
 		return IDO_ERROR;
 	}
 
-	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X7"), (uint *) data[6])) {
+	if (!OCI_BindInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X7"), (int *) data[6])) {
 		return IDO_ERROR;
 	}
-	if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X8"), (uint *) data[7])) {
+	if (!OCI_BindInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X8"), (int *) data[7])) {
 		return IDO_ERROR;
 	}
-        if (object_id == 0) {
-                if (ido2db_oci_prepared_statement_bind_null_param(idi->dbinfo.oci_statement_logentries_insert, ":X9") == IDO_ERROR) {
+
+
+    ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logdata() bind X9..(%lu)\n",object_id);
+    if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X9"),(uint *) &object_id)) {
                         return IDO_ERROR;
-                }
-        }else {
-                if (!OCI_BindUnsignedInt(idi->dbinfo.oci_statement_logentries_insert, MT(":X9"), (uint *) data[8])) {
-                        return IDO_ERROR;
-                }
-        }
+    }
+    /* important: bind first then set this bind to Null */
+    if (object_id == 0) {
+        /* get bind ptr, set to NULL */
+    	ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logdata() set X9 NULL\n");
+    	if (!OCI_BindSetNull(OCI_GetBind2(idi->dbinfo.oci_statement_logentries_insert, MT(":X9")))) {
+            				return IDO_ERROR;
+    	}
+    }
 
+    //bind clob
+    lob_i = OCI_LobCreate(idi->dbinfo.oci_connection, OCI_CLOB);
+    ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logdata() bind clob\n");
+    result = ido2db_oci_bind_clob(idi->dbinfo.oci_statement_logentries_insert, ":X6", *(char **) data[5], &lob_i);
 
-	//bind clob
-	lob_i = OCI_LobCreate(idi->dbinfo.oci_connection, OCI_CLOB);
-	ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_query_logentries_insert() bind clob\n");
-	result = ido2db_oci_bind_clob(idi->dbinfo.oci_statement_logentries_insert, ":X6", *(char **)data[5], &lob_i);
 	if (result == IDO_OK) {
 		/* execute statement */
+		ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logdata() executing..\n");
 		result = OCI_Execute(idi->dbinfo.oci_statement_logentries_insert) ? IDO_OK : IDO_ERROR;
 		if (result == IDO_OK) {
 			/* commit statement */
 			OCI_Commit(idi->dbinfo.oci_connection);
-			ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_query_logentries_insert() executed\n");
+			ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logdata() executed\n");
 		} else {
 			OCI_Rollback(idi->dbinfo.oci_connection);
-			ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_query_logentries_insert() execute error\n");
+			ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logdata() execute error\n");
 
 		}
 	} else {
-		ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_query_logentries_insert() bind clob error\n");
+		ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logdata()  bind clob error\n");
 	}
 	//free lobs
 	if (lob_i) OCI_LobFree(lob_i);
@@ -1913,9 +1934,9 @@ int ido2db_handle_logdata(ido2db_idi *idi) {
 	/* do not free statement yet! */
 #endif /* Oracle ocilib specific */
 
-	ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logdata() query ok\n");
+	ido2db_log_debug_info(IDO2DB_DEBUGL_PROCESSINFO, 2, "ido2db_handle_logdata() ok\n");
 
-	free(buf);
+	if (buf) free(buf);
 
 	/* free memory */
 	for (x = 0; x < ICINGA_SIZEOF_ARRAY(ts); x++)
